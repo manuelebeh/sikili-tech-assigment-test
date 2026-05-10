@@ -16,6 +16,7 @@ import os
 import xmlrpc.client
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from functools import partial
 from typing import Any, ParamSpec, TypeVar
 from urllib.parse import urljoin
@@ -24,6 +25,9 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 logger = logging.getLogger(__name__)
+
+# Generic sellable product used for free-text lines (description + price); override via env.
+_MISC_PRODUCT_DEFAULT_CODE = "SIKILI_MISC_LINE"
 
 
 class OdooError(Exception):
@@ -36,6 +40,10 @@ class OdooAuthenticationError(OdooError):
 
 class OdooPartnerCreateError(OdooError):
     """Failed to create a ``res.partner`` record via XML-RPC."""
+
+
+class OdooSaleOrderCreateError(OdooError):
+    """Failed to create a ``sale.order`` (or related product/line) via XML-RPC."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -289,6 +297,192 @@ def create_partner(
         email,
     )
     return new_id
+
+
+def _ensure_misc_sale_product(client: OdooXMLRPCClient) -> int:
+    """
+    Return a ``product.product`` id suitable for generic integration lines.
+
+    Uses ``ODOO_DEFAULT_SALE_PRODUCT_ID`` when set; otherwise searches by
+    ``default_code`` :data:`_MISC_PRODUCT_DEFAULT_CODE`, or creates a minimal service
+    product that is sellable.
+    """
+    raw = os.environ.get("ODOO_DEFAULT_SALE_PRODUCT_ID")
+    if raw is not None and str(raw).strip() != "":
+        try:
+            pid = int(raw)
+        except ValueError as e:
+            raise OdooSaleOrderCreateError(
+                f"ODOO_DEFAULT_SALE_PRODUCT_ID must be an integer, got {raw!r}"
+            ) from e
+        if pid <= 0:
+            raise OdooSaleOrderCreateError(
+                "ODOO_DEFAULT_SALE_PRODUCT_ID must be a positive integer"
+            )
+        return pid
+
+    found: Any = client.execute_kw(
+        "product.product",
+        "search",
+        [[["default_code", "=", _MISC_PRODUCT_DEFAULT_CODE], ["sale_ok", "=", True]]],
+        {"limit": 1},
+    )
+    if isinstance(found, list) and found:
+        return found[0]
+
+    pid_any: Any = client.execute_kw(
+        "product.product",
+        "create",
+        [
+            {
+                "name": "Miscellaneous (integration)",
+                "default_code": _MISC_PRODUCT_DEFAULT_CODE,
+                "type": "service",
+                "sale_ok": True,
+                "purchase_ok": False,
+            }
+        ],
+    )
+    if not isinstance(pid_any, int):
+        raise OdooSaleOrderCreateError(
+            f"product.product create expected integer id, got {type(pid_any).__name__}"
+        )
+    logger.info(
+        "Created placeholder product.product id=%s default_code=%r for integration "
+        "sale lines",
+        pid_any,
+        _MISC_PRODUCT_DEFAULT_CODE,
+    )
+    return pid_any
+
+
+def create_sale_order(
+    partner_id: int,
+    product_name: str,
+    amount: float | int | Decimal,
+    *,
+    client: OdooXMLRPCClient | None = None,
+    config: OdooConfig | None = None,
+) -> int:
+    """
+    Create a ``sale.order`` for ``partner_id`` with one ``sale.order.line``.
+
+    The line uses a generic sellable product (see :func:`_ensure_misc_sale_product`) and
+    sets the line description to ``product_name``, quantity ``1``, and ``price_unit``
+    from ``amount``. Returns the new ``sale.order`` id.
+
+    Raises:
+        OdooAuthenticationError: Invalid Odoo credentials.
+        OdooSaleOrderCreateError: Validation errors, RPC faults, transport errors, or bad
+            responses (e.g. Sales app not installed).
+    """
+    if partner_id <= 0:
+        raise OdooSaleOrderCreateError("partner_id must be a positive Odoo id")
+
+    line_name = product_name.strip()
+    if not line_name:
+        raise OdooSaleOrderCreateError("product_name must not be empty")
+
+    try:
+        unit_price = float(amount)
+    except (TypeError, ValueError) as e:
+        raise OdooSaleOrderCreateError(
+            f"amount must be numeric, got {amount!r}"
+        ) from e
+
+    if client is None:
+        cfg = config if config is not None else odoo_config_from_env()
+        client = OdooXMLRPCClient(cfg)
+
+    try:
+        product_id = _ensure_misc_sale_product(client)
+        order_vals: dict[str, Any] = {
+            "partner_id": partner_id,
+            "order_line": [
+                (
+                    0,
+                    0,
+                    {
+                        "product_id": product_id,
+                        "name": line_name,
+                        "product_uom_qty": 1,
+                        "price_unit": unit_price,
+                    },
+                )
+            ],
+        }
+        order_id: Any = client.execute_kw("sale.order", "create", [order_vals])
+    except OdooAuthenticationError:
+        logger.error(
+            "Odoo authentication failed while creating sale.order partner_id=%s "
+            "product_name=%r",
+            partner_id,
+            line_name,
+        )
+        raise
+    except xmlrpc.client.Fault as e:
+        logger.error(
+            "Odoo XML-RPC Fault creating sale.order: faultCode=%s faultString=%s "
+            "partner_id=%s product_name=%r amount=%s",
+            e.faultCode,
+            e.faultString,
+            partner_id,
+            line_name,
+            amount,
+        )
+        raise OdooSaleOrderCreateError(
+            f"Odoo rejected sale.order create (fault {e.faultCode}): {e.faultString}"
+        ) from e
+    except xmlrpc.client.ProtocolError as e:
+        logger.error(
+            "Odoo XML-RPC protocol error creating sale.order: errcode=%s errmsg=%s "
+            "partner_id=%s product_name=%r",
+            e.errcode,
+            e.errmsg,
+            partner_id,
+            line_name,
+        )
+        raise OdooSaleOrderCreateError(
+            f"Odoo XML-RPC transport error (HTTP {e.errcode}): {e.errmsg}"
+        ) from e
+    except OSError as e:
+        logger.error(
+            "Network error calling Odoo while creating sale.order: %s partner_id=%s",
+            e,
+            partner_id,
+        )
+        raise OdooSaleOrderCreateError(f"Could not reach Odoo: {e}") from e
+    except OdooError:
+        raise
+    except Exception as e:
+        logger.exception(
+            "Unexpected error creating Odoo sale.order partner_id=%s product_name=%r",
+            partner_id,
+            line_name,
+        )
+        raise OdooSaleOrderCreateError(
+            f"Unexpected error creating sale order: {e}"
+        ) from e
+
+    if not isinstance(order_id, int):
+        logger.error(
+            "sale.order create returned non-int: %r partner_id=%s product_name=%r",
+            type(order_id).__name__,
+            partner_id,
+            line_name,
+        )
+        raise OdooSaleOrderCreateError(
+            f"sale.order create expected integer id, got {type(order_id).__name__}"
+        )
+
+    logger.info(
+        "Created Odoo sale.order id=%s partner_id=%s line=%r qty=1 price_unit=%s",
+        order_id,
+        partner_id,
+        line_name,
+        unit_price,
+    )
+    return order_id
 
 
 def create_partner_sync(
