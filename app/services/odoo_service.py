@@ -11,6 +11,7 @@ the event loop.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import xmlrpc.client
 from collections.abc import Callable, Mapping
@@ -22,6 +23,8 @@ from urllib.parse import urljoin
 P = ParamSpec("P")
 R = TypeVar("R")
 
+logger = logging.getLogger(__name__)
+
 
 class OdooError(Exception):
     """Generic error from the Odoo XML-RPC client."""
@@ -29,6 +32,10 @@ class OdooError(Exception):
 
 class OdooAuthenticationError(OdooError):
     """Authentication failed (invalid credentials or database)."""
+
+
+class OdooPartnerCreateError(OdooError):
+    """Failed to create a ``res.partner`` record via XML-RPC."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,28 +189,123 @@ async def run_sync(fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
     return await loop.run_in_executor(None, partial(fn, *args, **kwargs))
 
 
-def create_partner_sync(
+def create_partner(
     name: str,
     email: str,
-    phone: str | None,
+    phone: str | None = None,
     *,
     client: OdooXMLRPCClient | None = None,
     config: OdooConfig | None = None,
 ) -> int:
     """
-    Create a ``res.partner`` record and return its id.
+    Create a customer ``res.partner`` (``customer_rank=1``) and return the Odoo record id.
 
     Pass either a configured :class:`OdooXMLRPCClient` or an :class:`OdooConfig` (a client
     will be created internally). If both are omitted, configuration is loaded via
     :func:`odoo_config_from_env`.
+
+    Raises:
+        OdooAuthenticationError: When login / database credentials are invalid.
+        OdooPartnerCreateError: On RPC faults, transport errors, or unexpected responses.
     """
     if client is None:
         cfg = config if config is not None else odoo_config_from_env()
         client = OdooXMLRPCClient(cfg)
-    vals: dict[str, Any] = {"name": name, "email": email}
-    if phone:
-        vals["phone"] = phone
-    new_id: Any = client.execute_kw("res.partner", "create", [vals])
+
+    vals: dict[str, Any] = {
+        "name": name.strip(),
+        "email": email.strip(),
+        "customer_rank": 1,
+    }
+    if phone and str(phone).strip():
+        vals["phone"] = str(phone).strip()
+
+    try:
+        new_id: Any = client.execute_kw("res.partner", "create", [vals])
+    except OdooAuthenticationError:
+        logger.error(
+            "Odoo authentication failed while creating partner name=%r email=%r",
+            name,
+            email,
+        )
+        raise
+    except xmlrpc.client.Fault as e:
+        logger.error(
+            "Odoo XML-RPC Fault creating res.partner: faultCode=%s faultString=%s "
+            "name=%r email=%r",
+            e.faultCode,
+            e.faultString,
+            name,
+            email,
+        )
+        raise OdooPartnerCreateError(
+            f"Odoo rejected partner create (fault {e.faultCode}): {e.faultString}"
+        ) from e
+    except xmlrpc.client.ProtocolError as e:
+        logger.error(
+            "Odoo XML-RPC protocol error creating partner: errcode=%s errmsg=%s "
+            "name=%r email=%r",
+            e.errcode,
+            e.errmsg,
+            name,
+            email,
+        )
+        raise OdooPartnerCreateError(
+            f"Odoo XML-RPC transport error (HTTP {e.errcode}): {e.errmsg}"
+        ) from e
+    except OSError as e:
+        logger.error(
+            "Network error calling Odoo while creating partner: %s name=%r email=%r",
+            e,
+            name,
+            email,
+        )
+        raise OdooPartnerCreateError(f"Could not reach Odoo: {e}") from e
+    except OdooError:
+        raise
+    except Exception as e:
+        logger.exception(
+            "Unexpected error creating Odoo res.partner name=%r email=%r",
+            name,
+            email,
+        )
+        raise OdooPartnerCreateError(f"Unexpected error creating partner: {e}") from e
+
     if not isinstance(new_id, int):
-        raise OdooError(f"res.partner create expected int, got {type(new_id)!r}")
+        logger.error(
+            "res.partner create returned non-int: %r name=%r email=%r",
+            type(new_id).__name__,
+            name,
+            email,
+        )
+        raise OdooPartnerCreateError(
+            f"res.partner create expected integer id, got {type(new_id).__name__}"
+        )
+
+    logger.info(
+        "Created Odoo res.partner id=%s customer_rank=1 name=%r email=%r",
+        new_id,
+        name,
+        email,
+    )
     return new_id
+
+
+def create_partner_sync(
+    name: str,
+    email: str,
+    phone: str | None = None,
+    *,
+    client: OdooXMLRPCClient | None = None,
+    config: OdooConfig | None = None,
+) -> int:
+    """
+    Same as :func:`create_partner` (sync XML-RPC); kept for backward compatibility.
+    """
+    return create_partner(
+        name,
+        email,
+        phone,
+        client=client,
+        config=config,
+    )
