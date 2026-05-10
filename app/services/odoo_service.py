@@ -132,7 +132,11 @@ class OdooXMLRPCClient:
 
     def version(self) -> dict[str, Any]:
         """Server info without authentication; useful for a quick connectivity check."""
-        return self._common.version()
+        try:
+            return self._common.version()
+        except (xmlrpc.client.Fault, xmlrpc.client.ProtocolError, OSError) as e:
+            self._log_rpc_exception("common.version", e)
+            raise
 
     def authenticate(self) -> int:
         """
@@ -140,12 +144,16 @@ class OdooXMLRPCClient:
 
         The uid is cached for subsequent :meth:`execute_kw` calls.
         """
-        uid = self._common.authenticate(
-            self._config.database,
-            self._config.username,
-            self._config.password,
-            {},
-        )
+        try:
+            uid = self._common.authenticate(
+                self._config.database,
+                self._config.username,
+                self._config.password,
+                {},
+            )
+        except (xmlrpc.client.Fault, xmlrpc.client.ProtocolError, OSError) as e:
+            self._log_rpc_exception("common.authenticate", e)
+            raise
         if not uid or not isinstance(uid, int):
             raise OdooAuthenticationError(
                 "authenticate() failed: check database name, login, and password "
@@ -153,6 +161,40 @@ class OdooXMLRPCClient:
             )
         self._uid = uid
         return uid
+
+    def _log_rpc_exception(self, operation: str, exc: Exception) -> None:
+        """Structured log for each failed XML-RPC round-trip (warning level)."""
+        if isinstance(exc, xmlrpc.client.Fault):
+            logger.warning(
+                "odoo_xmlrpc_fault operation=%s faultCode=%s faultString=%s",
+                operation,
+                exc.faultCode,
+                exc.faultString,
+                extra={
+                    "odoo_operation": operation,
+                    "odoo_fault_code": exc.faultCode,
+                    "odoo_fault_string": exc.faultString,
+                },
+            )
+        elif isinstance(exc, xmlrpc.client.ProtocolError):
+            logger.warning(
+                "odoo_xmlrpc_protocol operation=%s errcode=%s errmsg=%s url=%s",
+                operation,
+                exc.errcode,
+                exc.errmsg,
+                getattr(exc, "url", ""),
+                extra={
+                    "odoo_operation": operation,
+                    "odoo_http_status": exc.errcode,
+                },
+            )
+        else:
+            logger.warning(
+                "odoo_xmlrpc_transport operation=%s error=%s",
+                operation,
+                exc,
+                extra={"odoo_operation": operation},
+            )
 
     @property
     def uid(self) -> int:
@@ -176,15 +218,19 @@ class OdooXMLRPCClient:
         """
         pos_args = [] if args is None else args
         kw = dict(kwargs or {})
-        return self._object.execute_kw(
-            self._config.database,
-            self.uid,
-            self._config.password,
-            model,
-            method,
-            pos_args,
-            kw,
-        )
+        try:
+            return self._object.execute_kw(
+                self._config.database,
+                self.uid,
+                self._config.password,
+                model,
+                method,
+                pos_args,
+                kw,
+            )
+        except (xmlrpc.client.Fault, xmlrpc.client.ProtocolError, OSError) as e:
+            self._log_rpc_exception(f"object.execute_kw:{model}.{method}", e)
+            raise
 
     def invalidate_session(self) -> None:
         """Clear cached uid so the next call that needs it will re-authenticate."""
@@ -231,44 +277,11 @@ def create_partner(
     try:
         new_id: Any = client.execute_kw("res.partner", "create", [vals])
     except OdooAuthenticationError:
-        logger.error(
-            "Odoo authentication failed while creating partner name=%r email=%r",
-            name,
-            email,
-        )
         raise
-    except xmlrpc.client.Fault as e:
-        logger.error(
-            "Odoo XML-RPC Fault creating res.partner: faultCode=%s faultString=%s "
-            "name=%r email=%r",
-            e.faultCode,
-            e.faultString,
-            name,
-            email,
-        )
+    except (xmlrpc.client.Fault, xmlrpc.client.ProtocolError, OSError) as e:
         raise OdooPartnerCreateError(
-            f"Odoo rejected partner create (fault {e.faultCode}): {e.faultString}"
+            f"Odoo partner create failed ({type(e).__name__}): {e}"
         ) from e
-    except xmlrpc.client.ProtocolError as e:
-        logger.error(
-            "Odoo XML-RPC protocol error creating partner: errcode=%s errmsg=%s "
-            "name=%r email=%r",
-            e.errcode,
-            e.errmsg,
-            name,
-            email,
-        )
-        raise OdooPartnerCreateError(
-            f"Odoo XML-RPC transport error (HTTP {e.errcode}): {e.errmsg}"
-        ) from e
-    except OSError as e:
-        logger.error(
-            "Network error calling Odoo while creating partner: %s name=%r email=%r",
-            e,
-            name,
-            email,
-        )
-        raise OdooPartnerCreateError(f"Could not reach Odoo: {e}") from e
     except OdooError:
         raise
     except Exception as e:
@@ -413,45 +426,11 @@ def create_sale_order(
         }
         order_id: Any = client.execute_kw("sale.order", "create", [order_vals])
     except OdooAuthenticationError:
-        logger.error(
-            "Odoo authentication failed while creating sale.order partner_id=%s "
-            "product_name=%r",
-            partner_id,
-            line_name,
-        )
         raise
-    except xmlrpc.client.Fault as e:
-        logger.error(
-            "Odoo XML-RPC Fault creating sale.order: faultCode=%s faultString=%s "
-            "partner_id=%s product_name=%r amount=%s",
-            e.faultCode,
-            e.faultString,
-            partner_id,
-            line_name,
-            amount,
-        )
+    except (xmlrpc.client.Fault, xmlrpc.client.ProtocolError, OSError) as e:
         raise OdooSaleOrderCreateError(
-            f"Odoo rejected sale.order create (fault {e.faultCode}): {e.faultString}"
+            f"Odoo sale order create failed ({type(e).__name__}): {e}"
         ) from e
-    except xmlrpc.client.ProtocolError as e:
-        logger.error(
-            "Odoo XML-RPC protocol error creating sale.order: errcode=%s errmsg=%s "
-            "partner_id=%s product_name=%r",
-            e.errcode,
-            e.errmsg,
-            partner_id,
-            line_name,
-        )
-        raise OdooSaleOrderCreateError(
-            f"Odoo XML-RPC transport error (HTTP {e.errcode}): {e.errmsg}"
-        ) from e
-    except OSError as e:
-        logger.error(
-            "Network error calling Odoo while creating sale.order: %s partner_id=%s",
-            e,
-            partner_id,
-        )
-        raise OdooSaleOrderCreateError(f"Could not reach Odoo: {e}") from e
     except OdooError:
         raise
     except Exception as e:
