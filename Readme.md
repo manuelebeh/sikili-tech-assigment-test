@@ -47,3 +47,14 @@ Then open **`http://127.0.0.1:8069/web/login?debug=assets`** and hard-refresh a 
 Everything is read from **`.env`**: copy **`.env.example`**, then set at least **`POSTGRES_PASSWORD`**, **`ODOO_ADMIN_PASSWD`**, and **`ODOO_ADDONS_PATH`** (comma-separated list: mounted addons + official addons inside the image).
 
 Under Docker, **`odoo.conf` is generated at startup** by `docker/odoo/docker-entrypoint.sh` from those variables (DB host/port/user/password, `addons_path`, `admin_passwd`). For Odoo **outside Docker**, use **`config/odoo.conf.example`** as a template for a local file.
+
+## Assumptions (schema)
+
+- **Pas de table `products`** : le brief traite le produit comme **texte libre** sur la commande (`product_name` + `amount`), sans catalogue ni liste à maintenir. Éviter une entité Produit réduit la surface (CRUD, sync Odoo `product.product`). Avec plus de temps, on pourrait aligner sur un catalogue Odoo et une table produits locale pour la sélection depuis un référentiel.
+
+- **Odoo / XML-RPC** : les appels synchrones (`xmlrpc.client`) ne doivent pas bloquer la boucle asyncio — les encapsuler avec `asyncio.get_running_loop().run_in_executor` (voir `app/services/odoo_service.py`).
+
+## Base de données & migrations
+
+- Variables **`PGHOST`**, **`PGPORT`**, **`PGUSER`**, **`PGPASSWORD`**, **`PGDATABASE`** (comme dans Docker Compose), ou **`DATABASE_URL`** pour une URL SQLAlchemy complète (voir `.env.example`).
+- **Alembic** : `uv run alembic upgrade head` (répertoire racine du repo). Sous Docker, la stack lance `alembic upgrade head` avant `uvicorn` pour créer les tables au démarrage.

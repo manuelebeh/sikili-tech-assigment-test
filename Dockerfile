@@ -21,6 +21,8 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project
 
+COPY alembic.ini .
+COPY alembic ./alembic
 COPY app ./app
 
 RUN useradd --create-home --uid 10001 appuser \

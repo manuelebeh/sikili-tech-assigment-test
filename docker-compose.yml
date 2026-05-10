@@ -125,6 +125,9 @@ services:
       ODOO_URL: http://odoo:8069
     networks:
       - app
+    command: >
+      sh -c "alembic upgrade head &&
+      exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"
 
 volumes:
   postgres_data:
