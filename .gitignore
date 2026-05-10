@@ -1,0 +1,143 @@
+# ------------------------------------------------------
+# Python / FastAPI
+# ------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Packaging / build artifacts
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+*.egg
+.installed.cfg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.direnv/
+
+# Python tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.nox/
+.tox/
+.hypothesis/
+pip-wheel-metadata/
+
+# Test and coverage artifacts
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+nosetests.xml
+
+# Logs
+*.log
+uvicorn.log
+gunicorn.log
+
+# ------------------------------------------------------
+# FastAPI / docs / generated
+# ------------------------------------------------------
+openapi.json
+docs/_build/
+
+# ------------------------------------------------------
+# Odoo
+# ------------------------------------------------------
+# Runtime data and generated files
+filestore/
+sessions/
+.local/
+
+# Odoo logs and PID/lock files
+odoo*.log
+*.pid
+*.lock
+
+# Odoo config is usually local and may contain secrets
+odoo.conf
+
+# ------------------------------------------------------
+# Alembic / SQLAlchemy
+# ------------------------------------------------------
+# Keep migration scripts in alembic/versions committed.
+*.sqlite3
+*.db
+alembic.ini
+
+# ------------------------------------------------------
+# PostgreSQL / Docker local data
+# ------------------------------------------------------
+pgdata/
+postgres-data/
+data/postgres/
+docker-data/
+
+# Docker local overrides
+docker-compose.override.yml
+
+# ------------------------------------------------------
+# Environment and secrets
+# ------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# Secret files
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.der
+*.jks
+*.keystore
+
+# ------------------------------------------------------
+# Deployment / ops local artifacts
+# ------------------------------------------------------
+# Local backups and dumps (keep migration files in git)
+*.sql.gz
+*.dump
+*.bak
+*.backup
+backups/
+tmp/
+temp/
+
+# Patch/merge leftovers
+*.orig
+*.rej
+
+# ------------------------------------------------------
+# IDE / Editor
+# ------------------------------------------------------
+.idea/
+.vscode/
+*.code-workspace
+
+# ------------------------------------------------------
+# OS files
+# ------------------------------------------------------
+.DS_Store
+Thumbs.db
