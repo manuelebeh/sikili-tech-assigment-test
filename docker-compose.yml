@@ -59,20 +59,29 @@ services:
   odoo:
     image: odoo:18.0
     restart: unless-stopped
+    # write /etc/odoo/odoo.conf at startup (root), then run Odoo as user odoo
+    user: "0:0"
     depends_on:
       db:
         condition: service_healthy
     ports:
       - "8069:8069"
+    env_file:
+      - .env
     environment:
-      # Variables expected by the official Odoo image (must match POSTGRES_* of the db service)
-      HOST: db
-      USER: ${POSTGRES_USER:-odoo}
-      PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:?Define ODOO_ADDONS_PATH in .env}
+      ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD:?Define ODOO_ADMIN_PASSWD in .env}
+      ODOO_RC: /etc/odoo/odoo.conf
     volumes:
       - ./addons:/mnt/extra-addons
       # Persistence filestore / application data Odoo (essential for non-trivial tests)
       - odoo_data:/var/lib/odoo
+      - ./docker/odoo/docker-entrypoint.sh:/docker-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/docker-entrypoint.sh"]
     healthcheck:
       # First DB initialization can be long → start_period large
       test:
@@ -103,8 +112,8 @@ services:
       - .env
     environment:
       # Preferred to a unique DATABASE_URL: no problem with encoding special characters in the password
-      PGHOST: db
-      PGPORT: "5432"
+      PGHOST: ${POSTGRES_HOST:-db}
+      PGPORT: ${POSTGRES_PORT:-5432}
       PGUSER: ${POSTGRES_USER:-odoo}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
       PGDATABASE: ${POSTGRES_DB:-postgres}
