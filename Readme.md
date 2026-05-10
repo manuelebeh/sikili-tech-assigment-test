@@ -1,30 +1,49 @@
-# Sikili — stack FastAPI / PostgreSQL / Odoo
+# Sikili — FastAPI / PostgreSQL / Odoo stack
 
-## Développement local (tout passe par **uv**)
+## Local development (via **uv**)
 
-1. Installer [uv](https://docs.astral.sh/uv/getting-started/installation/).
-2. À la racine du dépôt :
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/).
+2. At the repository root:
 
 ```bash
-uv python install 3.12    # une fois si aucune 3.12 dispo pour uv
-uv sync                     # crée .venv/ et installe depuis uv.lock
+uv python install 3.12    # once, if uv has no 3.12 available yet
+uv sync                     # creates .venv/ and installs from uv.lock
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-- Ajouter une dépendance : `uv add <nom-du-paquet>` (met à jour `pyproject.toml` et `uv.lock`).
-- Ne pas commiter `.venv/` ; **commiter** `pyproject.toml` et `uv.lock`.
+- Add a dependency: `uv add <package>` (updates `pyproject.toml` and `uv.lock`).
+- Do not commit `.venv/`; **do commit** `pyproject.toml` and `uv.lock`.
 
-## Docker (Python fourni par l’image, pas besoin de 3.12 sur l’hôte)
+## Docker (Python comes from the image; no host 3.12 required)
 
 ```bash
-cp .env.example .env   # puis renseigner les secrets (voir ci-dessous)
+cp .env.example .env   # then set secrets (see below)
 docker compose up -d --build
 ```
 
-L’API est exposée sur le port **8000**, Odoo sur **8069**.
+The API listens on **8000**, Odoo on **8069** (+ **8072** for the gevent worker / real-time bus).
 
-### Variables d’environnement (aucune valeur sensible dans le dépôt)
+### Odoo: blank page after login, or login page without CSS
 
-Tout est lu depuis **`.env`** : copier **`.env.example`**, puis définir au minimum **`POSTGRES_PASSWORD`**, **`ODOO_ADMIN_PASSWD`**, et **`ODOO_ADDONS_PATH`** (liste séparée par des virgules : addons montés + addons officiels dans l’image).
+This is a known issue with Odoo + Docker (including macOS): `/odoo` or `/web` stays blank even though auth works.
 
-Sous Docker, **`odoo.conf` est généré au démarrage** par `docker/odoo/docker-entrypoint.sh` à partir de ces variables (hôte / port / user / mot de passe DB, `addons_path`, `admin_passwd`). Pour une installation Odoo **hors Docker**, t’inspirer de **`config/odoo.conf.example`** (fichier local non versionné si tu préfères).
+1. **Ports**: **8069** and **8072** mappings must be active (`docker compose ps`). Generated config sets **`gevent_port = 8072`** (Odoo 18 — replaces deprecated `longpolling_port`).
+2. **Single base URL**: stick to one host (**`127.0.0.1`** *or* **`localhost`**, not both). Optionally set **Settings → Technical → Parameters → System → `web.base.url`** to match.
+3. **Asset caches**: from the repo root, pass your database name (e.g. `sikili_test_db`):
+
+```bash
+./docker/odoo/rebuild-web-assets.sh sikili_test_db
+```
+
+Then open **`http://127.0.0.1:8069/web/login?debug=assets`** and hard-refresh a few times.
+
+4. **Browser**: prefer **Chrome or Firefox**; use **F12 → Console / Network** to inspect **`/web/assets/...`** (500s or blocked files).
+
+5. **`Permission denied` on `/var/lib/odoo/filestore`** (see `docker compose logs odoo`): the filestore must belong to user **`odoo`**. `docker/odoo/docker-entrypoint.sh` runs **`chown -R odoo:odoo /var/lib/odoo`** on startup; after updating it, run **`docker compose up -d --force-recreate odoo`**. One-off fix:  
+   `docker compose exec -u root odoo chown -R odoo:odoo /var/lib/odoo`
+
+### Environment variables (no secrets in the repo)
+
+Everything is read from **`.env`**: copy **`.env.example`**, then set at least **`POSTGRES_PASSWORD`**, **`ODOO_ADMIN_PASSWD`**, and **`ODOO_ADDONS_PATH`** (comma-separated list: mounted addons + official addons inside the image).
+
+Under Docker, **`odoo.conf` is generated at startup** by `docker/odoo/docker-entrypoint.sh` from those variables (DB host/port/user/password, `addons_path`, `admin_passwd`). For Odoo **outside Docker**, use **`config/odoo.conf.example`** as a template for a local file.

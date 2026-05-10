@@ -66,6 +66,8 @@ services:
         condition: service_healthy
     ports:
       - "8069:8069"
+      # Gevent / bus (real-time); map for full Odoo behaviour (main UI still uses 8069)
+      - "8072:8072"
     env_file:
       - .env
     environment:
@@ -81,18 +83,20 @@ services:
       # Persistence filestore / application data Odoo (essential for non-trivial tests)
       - odoo_data:/var/lib/odoo
       - ./docker/odoo/docker-entrypoint.sh:/docker-entrypoint.sh:ro
-    entrypoint: ["/bin/bash", "/docker-entrypoint.sh"]
+    # CMD "odoo" must be explicit: otherwise $@ can be empty and /entrypoint.sh fails.
+    entrypoint: ["/docker-entrypoint.sh"]
+    command: ["odoo"]
     healthcheck:
-      # First DB initialization can be long → start_period large
+      # TCP on 8069: does not depend on HTTP code (/web can return 302/404 depending on the database).
       test:
         [
           "CMD-SHELL",
-          "wget -q -O /dev/null http://127.0.0.1:8069/web/database/selector || exit 1",
+          "python3 -c \"import socket; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1',8069)); s.close()\"",
         ]
       interval: 15s
       timeout: 10s
-      retries: 12
-      start_period: 300s
+      retries: 10
+      start_period: 360s
     networks:
       - app
 
