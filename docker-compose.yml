@@ -1,0 +1,122 @@
+# Stack: PostgreSQL 16 + Odoo 18 + FastAPI
+# Requirements: copy .env.example to .env and fill POSTGRES_PASSWORD (strong password).
+#
+# Best practices applied:
+# - Internal application network: PostgreSQL is not exposed on the host.
+# - Healthchecks: pg_isready (TCP 127.0.0.1) for Postgres ; HTTP for Odoo (long startup → start_period).
+# - depends_on + condition: service_healthy to avoid races at startup.
+# - Secrets via file .env (do not commit) ; passwords required via ${VAR:?message}.
+# - Named volumes for DB and Odoo filestore data (survives restarts).
+# - Postgres: reasonable settings for a small server / dev (adjust according to RAM).
+
+name: sikili-stack
+
+services:
+  db:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      # Character set consistent with Odoo / UTF-8
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Perf: reasonable settings for a small container (SSD). Adjust in prod according to RAM.
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - log_connections=off
+      - -c
+      - log_disconnections=off
+    healthcheck:
+      # TCP on 127.0.0.1 (avoid a « healthy » too soon via socket only)
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -h 127.0.0.1 -p 5432",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - app
+
+  odoo:
+    image: odoo:18.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8069:8069"
+    environment:
+      # Variables expected by the official Odoo image (must match POSTGRES_* of the db service)
+      HOST: db
+      USER: ${POSTGRES_USER:-odoo}
+      PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./addons:/mnt/extra-addons
+      # Persistence filestore / application data Odoo (essential for non-trivial tests)
+      - odoo_data:/var/lib/odoo
+    healthcheck:
+      # First DB initialization can be long → start_period large
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:8069/web/database/selector || exit 1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 300s
+    networks:
+      - app
+
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      odoo:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Preferred to a unique DATABASE_URL: no problem with encoding special characters in the password
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-odoo}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      PGDATABASE: ${POSTGRES_DB:-postgres}
+      # Internal XML-RPC / HTTP access (service name = Docker DNS)
+      ODOO_URL: http://odoo:8069
+    networks:
+      - app
+
+volumes:
+  postgres_data:
+  odoo_data:
+
+networks:
+  app:
+    driver: bridge
