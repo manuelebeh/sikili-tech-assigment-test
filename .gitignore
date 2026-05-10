@@ -30,7 +30,6 @@ MANIFEST
 venv/
 env/
 ENV/
-.python-version
 .direnv/
 
 # Python tooling caches
@@ -69,10 +68,11 @@ filestore/
 sessions/
 .local/
 
-# Odoo logs and PID/lock files
+# Odoo logs and PID/runtime lock files
 odoo*.log
 *.pid
 *.lock
+!uv.lock
 
 # Odoo config is usually local and may contain secrets
 odoo.conf
