@@ -2,7 +2,7 @@
 name = "sikili-webapp"
 version = "0.1.0"
 description = "FastAPI service (stack Sikili)"
-readme = "Readme.md"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "python-multipart>=0.0.9",
