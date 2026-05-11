@@ -1,5 +1,3 @@
-# Dependencies installed with uv + uv.lock (reproducible).
-# Reference: https://docs.astral.sh/uv/guides/integration/docker/
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,7 +14,6 @@ RUN apt-get update \
         libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Layer dedicated to dependencies (better Docker cache) — `--frozen` without unnecessary network resolution
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project

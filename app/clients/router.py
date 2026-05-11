@@ -19,7 +19,6 @@ def list_clients(
     limit: int = 100,
     db: Session = Depends(get_db),
 ) -> list[schemas.ClientRead]:
-    """Return clients ordered by id with optional pagination."""
     rows = service.list_clients(db, skip=skip, limit=limit)
     return [schemas.ClientRead.model_validate(r) for r in rows]
 
@@ -47,7 +46,6 @@ def create_client(
     body: schemas.ClientCreate,
     db: Session = Depends(get_db),
 ) -> schemas.ClientRead:
-    """Create locally and sync to Odoo; see router description for the flow."""
     row = service.create_client(db, body)
     return schemas.ClientRead.model_validate(row)
 
@@ -64,7 +62,6 @@ def list_client_orders(
     limit: int = 100,
     db: Session = Depends(get_db),
 ) -> list[OrderRead]:
-    """Orders for ``client_id``, increasing id (pagination)."""
     rows = orders_service.list_orders_for_client(
         db, client_id, skip=skip, limit=limit
     )
@@ -98,6 +95,5 @@ def create_client_order(
     body: OrderCreate,
     db: Session = Depends(get_db),
 ) -> OrderRead:
-    """Create locally and sync to Odoo; see router description."""
     row = orders_service.create_order(db, client_id, body)
     return OrderRead.model_validate(row)

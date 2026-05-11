@@ -1,7 +1,4 @@
 #!/bin/bash
-# Generate odoo.conf from environment (no secrets in the repo).
-# Use Python to write the INI: passwords can contain $, #, etc.
-
 set -euo pipefail
 
 : "${POSTGRES_HOST:?POSTGRES_HOST is required}"
@@ -22,7 +19,6 @@ import os
 import configparser
 from pathlib import Path
 
-# RawConfigParser: no `%` interpolation (passwords with % or $ stay literal for Odoo).
 conf_path = Path(os.environ["CONF"])
 opts = {
     "addons_path": os.environ["ODOO_ADDONS_PATH"],
@@ -34,7 +30,6 @@ opts = {
     "db_password": os.environ["POSTGRES_PASSWORD"],
     "http_interface": "0.0.0.0",
     "http_port": "8069",
-    # Odoo 16+: gevent (real-time / bus); longpolling_port is deprecated in favor of gevent_port.
     "gevent_port": "8072",
 }
 cfg = configparser.RawConfigParser()
@@ -48,8 +43,6 @@ PY
 chown odoo:odoo "$CONF"
 chmod 640 "$CONF"
 
-# Volume odoo_data -> /var/lib/odoo must be writable by the Odoo process.
-# Otherwise bundle generation for `/web/assets/*` hits PermissionError under .../filestore/... -> HTTP 500.
 mkdir -p /var/lib/odoo
 chown -R odoo:odoo /var/lib/odoo
 

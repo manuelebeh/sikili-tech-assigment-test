@@ -26,7 +26,6 @@ R = TypeVar("R")
 
 logger = logging.getLogger(__name__)
 
-# Generic sellable product used for free-text lines (description + price); override via env.
 _MISC_PRODUCT_DEFAULT_CODE = "SIKILI_MISC_LINE"
 
 

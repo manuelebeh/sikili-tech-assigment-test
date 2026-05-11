@@ -1,4 +1,4 @@
-"""Minimal HTML UI: forms and lists with visible errors (no styling polish)."""
+"""Minimal HTML UI: forms and lists with validation errors."""
 
 from __future__ import annotations
 

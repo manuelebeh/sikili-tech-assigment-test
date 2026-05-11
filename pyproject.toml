@@ -16,6 +16,5 @@ dependencies = [
     "email-validator>=2.3.0",
 ]
 
-# FastAPI application: no PyPI publication; only dependencies (no package installed).
 [tool.uv]
 package = false

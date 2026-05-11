@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, pool
 from app.config import settings
 from app.database import Base
 
-import app.clients.models  # noqa: F401 - register models with metadata
+import app.clients.models  # noqa: F401
 import app.orders.models  # noqa: F401
 
 config = context.config

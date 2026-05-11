@@ -1,14 +1,3 @@
-# Stack: PostgreSQL 16 + Odoo 18 + FastAPI
-# Requirements: copy .env.example to .env and fill POSTGRES_PASSWORD (strong password).
-#
-# Best practices applied:
-# - Internal application network: PostgreSQL is not exposed on the host.
-# - Healthchecks: pg_isready (TCP 127.0.0.1) for Postgres ; HTTP for Odoo (long startup → start_period).
-# - depends_on + condition: service_healthy to avoid races at startup.
-# - Secrets via file .env (do not commit) ; passwords required via ${VAR:?message}.
-# - Named volumes for DB and Odoo filestore data (survives restarts).
-# - Postgres: reasonable settings for a small server / dev (adjust according to RAM).
-
 name: sikili-stack
 
 services:
@@ -19,11 +8,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-odoo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
-      # Character set consistent with Odoo / UTF-8
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # Perf: reasonable settings for a small container (SSD). Adjust in prod according to RAM.
     command:
       - postgres
       - -c
@@ -43,7 +30,6 @@ services:
       - -c
       - log_disconnections=off
     healthcheck:
-      # TCP on 127.0.0.1 (avoid marking healthy too soon via socket-only checks)
       test:
         [
           "CMD-SHELL",
@@ -66,7 +52,6 @@ services:
         condition: service_healthy
     ports:
       - "8069:8069"
-      # Gevent / bus (real-time); map for full Odoo behaviour (main UI still uses 8069)
       - "8072:8072"
     env_file:
       - .env
@@ -80,14 +65,12 @@ services:
       ODOO_RC: /etc/odoo/odoo.conf
     volumes:
       - ./addons:/mnt/extra-addons
-      # Persistence filestore / application data Odoo (essential for non-trivial tests)
       - odoo_data:/var/lib/odoo
       - ./docker/odoo/docker-entrypoint.sh:/docker-entrypoint.sh:ro
     # CMD "odoo" must be explicit: otherwise $@ can be empty and /entrypoint.sh fails.
     entrypoint: ["/docker-entrypoint.sh"]
     command: ["odoo"]
     healthcheck:
-      # TCP on 8069: does not depend on HTTP code (/web can return 302/404 depending on the database).
       test:
         [
           "CMD-SHELL",
@@ -115,13 +98,11 @@ services:
     env_file:
       - .env
     environment:
-      # Preferred to a unique DATABASE_URL: no problem with encoding special characters in the password
       PGHOST: ${POSTGRES_HOST:-db}
       PGPORT: ${POSTGRES_PORT:-5432}
       PGUSER: ${POSTGRES_USER:-odoo}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
       PGDATABASE: ${POSTGRES_DB:-postgres}
-      # Odoo XML-RPC (same DB name as in Odoo; login = Odoo user, not Postgres role)
       ODOO_URL: http://odoo:8069
       ODOO_DATABASE: ${ODOO_DATABASE:-postgres}
       ODOO_LOGIN: ${ODOO_LOGIN:-admin}
