@@ -83,7 +83,6 @@ odoo.conf
 # Keep migration scripts in alembic/versions committed.
 *.sqlite3
 *.db
-alembic.ini
 
 # ------------------------------------------------------
 # PostgreSQL / Docker local data
