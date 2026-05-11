@@ -31,6 +31,7 @@ opts = {
     "http_interface": "0.0.0.0",
     "http_port": "8069",
     "gevent_port": "8072",
+    "without_demo": "all",
 }
 cfg = configparser.RawConfigParser()
 cfg.add_section("options")

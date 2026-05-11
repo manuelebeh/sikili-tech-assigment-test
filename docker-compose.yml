@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-odoo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-sikili}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -45,7 +45,6 @@ services:
   odoo:
     image: odoo:18.0
     restart: unless-stopped
-    # write /etc/odoo/odoo.conf at startup (root), then run Odoo as user odoo
     user: "0:0"
     depends_on:
       db:
@@ -67,7 +66,6 @@ services:
       - ./addons:/mnt/extra-addons
       - odoo_data:/var/lib/odoo
       - ./docker/odoo/docker-entrypoint.sh:/docker-entrypoint.sh:ro
-    # CMD "odoo" must be explicit: otherwise $@ can be empty and /entrypoint.sh fails.
     entrypoint: ["/docker-entrypoint.sh"]
     command: ["odoo"]
     healthcheck:
@@ -102,9 +100,8 @@ services:
       PGPORT: ${POSTGRES_PORT:-5432}
       PGUSER: ${POSTGRES_USER:-odoo}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
-      PGDATABASE: ${POSTGRES_DB:-postgres}
+      PGDATABASE: ${POSTGRES_DB:-sikili}
       ODOO_URL: http://odoo:8069
-      ODOO_DATABASE: ${ODOO_DATABASE:-postgres}
       ODOO_LOGIN: ${ODOO_LOGIN:-admin}
       ODOO_PASSWORD: ${ODOO_PASSWORD:?Set ODOO_PASSWORD in .env for Odoo XML-RPC}
     networks:

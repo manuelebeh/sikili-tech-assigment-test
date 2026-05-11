@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     pgport: int = Field(default=5432, validation_alias="PGPORT")
     pguser: str = Field(default="odoo", validation_alias="PGUSER")
     pgpassword: str = Field(default="", validation_alias="PGPASSWORD")
-    pgdatabase: str = Field(default="postgres", validation_alias="PGDATABASE")
+    pgdatabase: str = Field(default="sikili", validation_alias="PGDATABASE")
 
     odoo_url: str = Field(
         default="http://localhost:8069",

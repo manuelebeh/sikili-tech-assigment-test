@@ -74,18 +74,18 @@ def odoo_config_from_env(
     Build an :class:`OdooConfig` from explicit arguments or environment variables:
 
     - ``ODOO_URL`` (defaults to ``http://localhost:8069`` when nothing else is set)
-    - ``ODOO_DB`` or ``ODOO_DATABASE``
+    - ``PGDATABASE`` (same DB as the app; Docker Compose sets it from ``POSTGRES_DB``)
     - ``ODOO_LOGIN`` or ``ODOO_USER``
     - ``ODOO_PASSWORD``
     """
     url = base_url or os.environ.get("ODOO_URL", "http://localhost:8069")
-    db = database or os.environ.get("ODOO_DB") or os.environ.get("ODOO_DATABASE")
+    db = database or os.environ.get("PGDATABASE")
     user = username or os.environ.get("ODOO_LOGIN") or os.environ.get("ODOO_USER")
     pwd = password or os.environ.get("ODOO_PASSWORD")
     missing = [
         name
         for name, val in (
-            ("ODOO_DB / ODOO_DATABASE", db),
+            ("PGDATABASE", db),
             ("ODOO_LOGIN / ODOO_USER", user),
             ("ODOO_PASSWORD", pwd),
         )
