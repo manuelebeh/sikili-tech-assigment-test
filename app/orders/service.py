@@ -13,13 +13,13 @@ from app.services.odoo_sync_support import (
 )
 
 
-def create_order(db: Session, data: OrderCreate) -> Order:
-    client = db.get(Client, data.client_id)
+def create_order(db: Session, client_id: int, data: OrderCreate) -> Order:
+    client = db.get(Client, client_id)
     if client is None:
         raise HTTPException(status_code=404, detail="Client not found")
 
     row = Order(
-        client_id=data.client_id,
+        client_id=client_id,
         product_name=data.product_name,
         amount=data.amount,
     )
@@ -82,11 +82,20 @@ def create_order(db: Session, data: OrderCreate) -> Order:
     return row
 
 
-def list_orders(
+def list_orders_for_client(
     db: Session,
+    client_id: int,
     *,
     skip: int = 0,
     limit: int = 100,
 ) -> list[Order]:
-    stmt = select(Order).order_by(Order.id).offset(skip).limit(limit)
+    if db.get(Client, client_id) is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    stmt = (
+        select(Order)
+        .where(Order.client_id == client_id)
+        .order_by(Order.id)
+        .offset(skip)
+        .limit(limit)
+    )
     return list(db.scalars(stmt).all())
