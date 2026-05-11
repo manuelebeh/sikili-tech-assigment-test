@@ -1,13 +1,17 @@
-# Example for reference / manual copy outside of Docker.
-# In Docker, odoo.conf is generated at startup by docker/odoo/docker-entrypoint.sh
-# based on the variables in the .env file (see .env.example).
+# Reference only. In Docker, this file is regenerated at startup by
+# docker/odoo/docker-entrypoint.sh from the variables in .env.
+#
+# Use this template if you run Odoo directly on the host (outside Docker).
 
 [options]
-addons_path = /mnt/extra-addons
-admin_passwd = change-me-master-password
+addons_path = /mnt/extra-addons,/usr/lib/python3/dist-packages/odoo/addons
+admin_passwd = admin
 data_dir = /var/lib/odoo
 db_host = db
 db_port = 5432
 db_user = odoo
-db_password = change-me-database-password
+db_password = odoo
+db_name = sikili
+dbfilter = ^sikili$
+list_db = False
 without_demo = all
