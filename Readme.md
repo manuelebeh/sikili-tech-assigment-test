@@ -2,7 +2,7 @@
 
 ## Quickstart (Docker)
 
-One command, zero manual setup. The stack starts PostgreSQL, Odoo 18 and the FastAPI app, and bootstraps the Odoo database with the **Sales** and **Contacts** modules on first boot (Invoicing is pulled in transitively as a dependency of Sales).
+One command, zero manual setup. The stack starts PostgreSQL, Odoo 18 and the FastAPI app, and bootstraps the Odoo database with the **Sales** (`sale_management`) and **Invoicing** (`account`) modules on first boot.
 
 ```bash
 git clone <repo>
@@ -11,7 +11,7 @@ cp .env.example .env
 docker compose up
 ```
 
-1. Wait ~2 minutes on the very first run: Odoo creates the database `sikili` and installs `sale_management` + `contacts` (Invoicing comes along as a dependency of Sales). The HTTP port stays closed until the bootstrap is done — that is intentional.
+1. Wait ~2 minutes on the very first run: Odoo creates the database `sikili` and installs `sale_management` + `account`. The HTTP port stays closed until the bootstrap is done — that is intentional.
 2. Open **http://localhost:8069** — Odoo login: `admin` / `admin`.
 3. Open **http://localhost:8000** — FastAPI app (and **http://localhost:8000/docs** for the OpenAPI UI).
 
@@ -24,7 +24,7 @@ On first boot, `docker/odoo/docker-entrypoint.sh`:
 - Renders `/etc/odoo/odoo.conf` from the `.env` variables (`db_name`, `dbfilter`, `list_db = False`, `without_demo = all`).
 - Waits for PostgreSQL.
 - Creates the `POSTGRES_DB` database if it doesn't exist.
-- If the Odoo schema isn't initialized yet, runs `odoo -d $POSTGRES_DB -i $ODOO_INIT_MODULES --without-demo=all --stop-after-init --no-http` (default modules: `sale_management,contacts`).
+- If the Odoo schema isn't initialized yet, runs `odoo -d $POSTGRES_DB -i $ODOO_INIT_MODULES --without-demo=all --stop-after-init --no-http` (default modules: `sale_management,account`).
 - Then exec's the regular Odoo server.
 
 To customize, edit `ODOO_INIT_MODULES` in `.env` before the first `docker compose up`.
@@ -53,7 +53,7 @@ Copy `.env.example` to `.env`. The provided defaults are sufficient to run the s
 | --- | --- |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Shared by PostgreSQL, the FastAPI app and Odoo. |
 | `ODOO_ADMIN_PASSWD` | Master password for Odoo DB management. |
-| `ODOO_INIT_MODULES` | Comma-separated list of Odoo modules installed on first boot. Defaults to `sale_management,contacts`. |
+| `ODOO_INIT_MODULES` | Comma-separated list of Odoo modules installed on first boot. Defaults to `sale_management,account` (Sales + Invoicing). |
 | `ODOO_LOGIN`, `ODOO_PASSWORD` | Credentials the FastAPI app uses to talk to Odoo via XML-RPC. Defaults to `admin` / `admin`. |
 | `ODOO_URL` | Base URL of Odoo. Overridden to `http://odoo:8069` inside Docker. |
 

@@ -62,7 +62,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-sikili}
       ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:?Define ODOO_ADDONS_PATH in .env}
       ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD:?Define ODOO_ADMIN_PASSWD in .env}
-      ODOO_INIT_MODULES: ${ODOO_INIT_MODULES:-sale_management,contacts}
+      ODOO_INIT_MODULES: ${ODOO_INIT_MODULES:-sale_management,account}
       ODOO_RC: /etc/odoo/odoo.conf
     volumes:
       - ./addons:/mnt/extra-addons

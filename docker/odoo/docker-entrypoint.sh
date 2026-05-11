@@ -9,7 +9,7 @@ set -euo pipefail
 : "${ODOO_ADDONS_PATH:?ODOO_ADDONS_PATH is required}"
 
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
-ODOO_INIT_MODULES="${ODOO_INIT_MODULES:-sale_management,contacts}"
+ODOO_INIT_MODULES="${ODOO_INIT_MODULES:-sale_management,account}"
 CONF="${ODOO_RC:-/etc/odoo/odoo.conf}"
 
 mkdir -p "$(dirname "$CONF")"
