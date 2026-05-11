@@ -64,17 +64,8 @@ Copy `.env.example` to `.env`. The provided defaults are sufficient to run the s
 
 ## Troubleshooting
 
-- **Odoo login page is unstyled** — the filestore ownership drifted (usually after a manual `docker compose exec` as root). Rebuild assets:
-
-  ```bash
-  ./docker/odoo/rebuild-web-assets.sh
-  ```
-
-  Then hit **http://127.0.0.1:8069/web/login?debug=assets** and hard-refresh.
-
-- **`docker compose up` exits because the DB volume is stale** — `docker compose down -v` to wipe `postgres_data` and `odoo_data`, then start again.
-
-- **Long first boot** — Odoo bootstrap is the longest step (~2 min). The Odoo container only marks itself healthy once port 8069 is open, so the FastAPI service waits for it.
+- **`docker compose up` exits because a previous DB volume is stale** — `docker compose down -v` to wipe `postgres_data` and `odoo_data`, then start again.
+- **Long first boot** — the Odoo bootstrap is the longest step (~2 min). The Odoo container only marks itself healthy once port 8069 is open, so the FastAPI service waits for it.
 
 ## Database
 
