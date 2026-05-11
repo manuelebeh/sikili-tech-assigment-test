@@ -1,1 +1,0 @@
-"""Sikili FastAPI application package."""

@@ -43,7 +43,7 @@ services:
       - -c
       - log_disconnections=off
     healthcheck:
-      # TCP on 127.0.0.1 (avoid a « healthy » too soon via socket only)
+      # TCP on 127.0.0.1 (avoid marking healthy too soon via socket-only checks)
       test:
         [
           "CMD-SHELL",
@@ -121,8 +121,11 @@ services:
       PGUSER: ${POSTGRES_USER:-odoo}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
       PGDATABASE: ${POSTGRES_DB:-postgres}
-      # Internal XML-RPC / HTTP access (service name = Docker DNS)
+      # Odoo XML-RPC (same DB name as in Odoo; login = Odoo user, not Postgres role)
       ODOO_URL: http://odoo:8069
+      ODOO_DATABASE: ${ODOO_DATABASE:-postgres}
+      ODOO_LOGIN: ${ODOO_LOGIN:-admin}
+      ODOO_PASSWORD: ${ODOO_PASSWORD:?Set ODOO_PASSWORD in .env for Odoo XML-RPC}
     networks:
       - app
     command: >

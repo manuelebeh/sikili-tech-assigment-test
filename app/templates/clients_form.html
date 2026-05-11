@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}New client · Sikili{% endblock %}
+{% block body %}
+<h1>New client</h1>
+{% if error %}
+  <div class="flash-err">{{ error }}</div>
+{% endif %}
+<form method="post" action="/ui/clients">
+  <label>Name <input type="text" name="name" value="{{ name }}" required maxlength="255" /></label>
+  <label>Email <input type="email" name="email" value="{{ email }}" required maxlength="320" /></label>
+  <label>Phone <input type="text" name="phone" value="{{ phone }}" maxlength="64" /></label>
+  <button type="submit">Save &amp; sync to Odoo</button>
+</form>
+<p class="muted"><a href="/ui/clients">Back to list</a></p>
+{% endblock %}

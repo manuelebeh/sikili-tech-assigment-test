@@ -6,8 +6,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application and integration settings from the environment (never hardcode secrets)."""
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -17,7 +15,6 @@ class Settings(BaseSettings):
     database_url: str | None = Field(
         default=None,
         validation_alias="DATABASE_URL",
-        description="Full SQLAlchemy URL; overrides PG* when set.",
     )
 
     pghost: str = Field(default="localhost", validation_alias="PGHOST")
@@ -29,7 +26,6 @@ class Settings(BaseSettings):
     odoo_url: str = Field(
         default="http://localhost:8069",
         validation_alias="ODOO_URL",
-        description="Base URL for Odoo (XML-RPC / HTTP).",
     )
 
     @property

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Orders · {{ client.name }} · Sikili{% endblock %}
+{% block body %}
+<h1>Orders for client #{{ client.id }}</h1>
+<p>{{ client.name }} — sync: <strong>{{ client.odoo_sync_status.value }}</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Order id</th>
+      <th>Product</th>
+      <th>Amount</th>
+      <th>Odoo order id</th>
+      <th>Sync status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for o in orders %}
+    <tr>
+      <td>{{ o.id }}</td>
+      <td>{{ o.product_name }}</td>
+      <td>{{ o.amount }}</td>
+      <td>{{ o.odoo_order_id if o.odoo_order_id is not none else "—" }}</td>
+      <td>{{ o.odoo_sync_status.value }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">No orders for this client.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><a href="/ui/clients/{{ client.id }}/orders/new">New order</a> · <a href="/ui/clients">All clients</a></p>
+{% endblock %}

@@ -1,1 +1,0 @@
-"""Sales orders domain."""

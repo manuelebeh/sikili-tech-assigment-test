@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Clients · Sikili{% endblock %}
+{% block body %}
+<h1>Clients</h1>
+<p class="muted">Odoo sync status per row (functional UI — not styled).</p>
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Odoo partner id</th>
+      <th>Sync status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in clients %}
+    <tr>
+      <td>{{ c.id }}</td>
+      <td>{{ c.name }}</td>
+      <td>{{ c.email }}</td>
+      <td>{{ c.odoo_partner_id if c.odoo_partner_id is not none else "—" }}</td>
+      <td>{{ c.odoo_sync_status.value }}</td>
+      <td>
+        <a href="/ui/clients/{{ c.id }}/orders">orders</a>
+        ·
+        <a href="/ui/clients/{{ c.id }}/orders/new">new order</a>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">No clients yet. <a href="/ui/clients/new">Create one</a>.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

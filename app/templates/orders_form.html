@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}New order · {{ client.name }} · Sikili{% endblock %}
+{% block body %}
+<h1>New order</h1>
+<p>Client #{{ client.id }} — {{ client.name }} (Odoo sync: {{ client.odoo_sync_status.value }})</p>
+{% if error %}
+  <div class="flash-err">{{ error }}</div>
+{% endif %}
+<form method="post" action="/ui/clients/{{ client.id }}/orders">
+  <label>Product name <input type="text" name="product_name" value="{{ product_name }}" required maxlength="512" /></label>
+  <label>Amount <input type="text" name="amount" value="{{ amount }}" required placeholder="e.g. 99.00" /></label>
+  <button type="submit">Save &amp; sync to Odoo</button>
+</form>
+<p class="muted">
+  <a href="/ui/clients/{{ client.id }}/orders">Orders list</a>
+  · <a href="/ui/clients">Clients</a>
+</p>
+{% endblock %}

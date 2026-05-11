@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Sikili{% endblock %}</title>
+  <style>
+    body { font-family: ui-monospace, monospace; max-width: 52rem; margin: 1rem auto; padding: 0 0.5rem; }
+    nav { margin-bottom: 1rem; border-bottom: 1px solid #888; padding-bottom: 0.5rem; }
+    nav a { margin-right: 1rem; color: #00e; }
+    .flash-ok { color: #060; background: #dfd; border: 1px solid #080; padding: 0.5rem; margin: 0.5rem 0; }
+    .flash-err { color: #600; background: #fdd; border: 1px solid #c00; padding: 0.5rem; margin: 0.5rem 0; white-space: pre-wrap; }
+    table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; }
+    th, td { border: 1px solid #555; padding: 0.35rem 0.5rem; vertical-align: top; }
+    th { background: #eee; }
+    label { display: block; margin-top: 0.6rem; }
+    input[type=text], input[type=email] { width: 100%; max-width: 28rem; }
+    button { margin-top: 0.75rem; padding: 0.25rem 0.75rem; }
+    .muted { color: #444; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/ui/clients">Clients</a>
+    <a href="/ui/clients/new">New client</a>
+  </nav>
+  {% if ok_message %}
+    <div class="flash-ok">{{ ok_message }}</div>
+  {% endif %}
+  {% if error_message %}
+    <div class="flash-err">{{ error_message }}</div>
+  {% endif %}
+  {% block body %}{% endblock %}
+</body>
+</html>
