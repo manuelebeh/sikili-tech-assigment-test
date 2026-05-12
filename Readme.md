@@ -68,7 +68,7 @@ RPC transport: **XML-RPC** (`/xmlrpc/2/common`, `/xmlrpc/2/object`) implemented 
 - **Routes stay synchronous** (`def` handlers): FastAPI runs them in a worker thread pool so blocking XML-RPC does not stall the asyncio loop. Helpers such as `run_sync` exist for future async call sites.
 - **Addons folder**: `docker-compose.yml` mounts `./addons` at `/mnt/extra-addons`. The repo ships an empty `addons/` (placeholder) so we can add custom modules without changing compose.
 
-## What we would improve with more time
+## What we would improve
 
 - **Retries and idempotency**: bounded retries on transient Odoo/network errors; optional idempotency keys to avoid duplicate partners or orders on double submit.
 - **Outbound webhooks or queue**: background worker (for example Celery or ARQ) so HTTP responses do not wait on Odoo latency; reconcile job for stuck `failed` rows.
