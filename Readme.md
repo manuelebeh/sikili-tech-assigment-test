@@ -2,6 +2,17 @@
 
 Small FastAPI web app with HTML forms: create clients, list them, create a sale order per client. Each action syncs to Odoo over XML-RPC. PostgreSQL stores local rows plus `odoo_partner_id`, `odoo_order_id`, and sync status.
 
+## Production (deployed)
+
+| Service | URL |
+| --- | --- |
+| Web app (UI) | [https://sikili-webapp.emmanuelebeh.dev](https://sikili-webapp.emmanuelebeh.dev) (redirects to `/ui/clients`) |
+| API / OpenAPI | [https://sikili-webapp.emmanuelebeh.dev/docs](https://sikili-webapp.emmanuelebeh.dev/docs) |
+| Health check | [https://sikili-webapp.emmanuelebeh.dev/health](https://sikili-webapp.emmanuelebeh.dev/health) |
+| Odoo (back office) | [https://sikili-odoo.emmanuelebeh.dev](https://sikili-odoo.emmanuelebeh.dev) |
+
+Odoo database name: `sikili`. Use the credentials configured in Dokploy (`ODOO_LOGIN` / `ODOO_PASSWORD` for the web user; `ODOO_ADMIN_PASSWD` for the master password).
+
 ## How to run the project locally
 
 ### Option A - Docker (recommended)
