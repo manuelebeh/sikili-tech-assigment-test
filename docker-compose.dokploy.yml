@@ -88,6 +88,7 @@ services:
       start_period: 360s
     networks:
       - internal
+      - dokploy-network
 
   webapp:
     image: ${SIKILI_WEBAPP_IMAGE:?Set SIKILI_WEBAPP_IMAGE to your registry image}

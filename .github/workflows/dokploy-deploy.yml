@@ -127,6 +127,14 @@ jobs:
             echo "::error::Set secrets DOKPLOY_URL, DOKPLOY_API_KEY, DOKPLOY_COMPOSE_ID"
             exit 1
           fi
+          # Strip quotes, whitespace and line endings often pasted from the UI by mistake.
+          DOKPLOY_URL="$(printf '%s' "$DOKPLOY_URL" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e 's#/*$##')"
+          DOKPLOY_API_KEY="$(printf '%s' "$DOKPLOY_API_KEY" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          DOKPLOY_COMPOSE_ID="$(printf '%s' "$DOKPLOY_COMPOSE_ID" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          if ! printf '%s' "$DOKPLOY_URL" | grep -qE '^https?://[^/[:space:]]+$'; then
+            echo "::error::DOKPLOY_URL must be only the base URL (e.g. http://host:3000), no /dashboard path, no trailing slash"
+            exit 1
+          fi
           http_code="$(curl -sS -o /tmp/dokploy-response.json -w "%{http_code}" \
             -X POST "${DOKPLOY_URL}/api/compose.deploy" \
             -H "accept: application/json" \
