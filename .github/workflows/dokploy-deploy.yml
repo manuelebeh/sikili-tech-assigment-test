@@ -1,0 +1,142 @@
+# Build webapp + Odoo images on GitHub runners, push to GHCR, trigger Dokploy Compose deploy.
+#
+# Required secrets:
+#   DOKPLOY_URL          https://dokploy.example.com (no trailing slash)
+#   DOKPLOY_API_KEY      API token (Settings → Profile → API/CLI)
+#   DOKPLOY_COMPOSE_ID   Compose service ID in Dokploy
+#
+# Optional variables (Settings → Secrets and variables → Actions → Variables):
+#   REGISTRY             default ghcr.io
+#   DEPLOY_BRANCH        default main
+
+name: Dokploy — build images and deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "ai-sessions/**"
+  workflow_dispatch:
+
+concurrency:
+  group: dokploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ${{ vars.REGISTRY || 'ghcr.io' }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      webapp_image: ${{ steps.meta-webapp.outputs.tags }}
+      odoo_image: ${{ steps.meta-odoo.outputs.tags }}
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Image names and tag
+        id: vars
+        run: |
+          owner_lc="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          echo "owner_lc=${owner_lc}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (webapp)
+        id: meta-webapp
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner_lc }}/sikili-webapp
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.vars.outputs.image_tag }}
+            type=sha,prefix=
+
+      - name: Build and push webapp
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta-webapp.outputs.tags }}
+          labels: ${{ steps.meta-webapp.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Docker metadata (odoo)
+        id: meta-odoo
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner_lc }}/sikili-odoo
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.vars.outputs.image_tag }}
+            type=sha,prefix=
+
+      - name: Build and push Odoo
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.odoo
+          push: true
+          tags: ${{ steps.meta-odoo.outputs.tags }}
+          labels: ${{ steps.meta-odoo.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-dokploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve image references
+        id: images
+        run: |
+          owner_lc="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          registry="${{ env.REGISTRY }}"
+          tag="${{ needs.build-and-push.outputs.image_tag }}"
+          echo "webapp=${registry}/${owner_lc}/sikili-webapp:${tag}" >> "$GITHUB_OUTPUT"
+          echo "odoo=${registry}/${owner_lc}/sikili-odoo:${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger Dokploy Compose deploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DOKPLOY_URL:-}" ] || [ -z "${DOKPLOY_API_KEY:-}" ] || [ -z "${DOKPLOY_COMPOSE_ID:-}" ]; then
+            echo "::error::Set secrets DOKPLOY_URL, DOKPLOY_API_KEY, DOKPLOY_COMPOSE_ID"
+            exit 1
+          fi
+          http_code="$(curl -sS -o /tmp/dokploy-response.json -w "%{http_code}" \
+            -X POST "${DOKPLOY_URL}/api/compose.deploy" \
+            -H "accept: application/json" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: ${DOKPLOY_API_KEY}" \
+            -d "{\"composeId\": \"${DOKPLOY_COMPOSE_ID}\"}")"
+          if [ "$http_code" != "200" ]; then
+            echo "::error::compose.deploy failed (HTTP ${http_code})"
+            cat /tmp/dokploy-response.json || true
+            exit 1
+          fi
+          echo "Dokploy deployment triggered (composeId=${DOKPLOY_COMPOSE_ID})"
+          echo "Images pushed:"
+          echo "  webapp: ${{ steps.images.outputs.webapp }}"
+          echo "  odoo:   ${{ steps.images.outputs.odoo }}"
+          echo "Ensure Dokploy .env sets SIKILI_WEBAPP_IMAGE / SIKILI_ODOO_IMAGE (see docs/DEPLOYMENT.md)."

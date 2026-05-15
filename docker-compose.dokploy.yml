@@ -1,0 +1,139 @@
+# Production Dokploy - images from registry only (no build on the server).
+# Compose path in Dokploy : ./docker-compose.dokploy.yml
+# CI/CD : .github/workflows/dokploy-deploy.yml
+# Required variables in Dokploy (.env) :
+#   SIKILI_WEBAPP_IMAGE=ghcr.io/<owner>/sikili-webapp:latest
+#   SIKILI_ODOO_IMAGE=ghcr.io/<owner>/sikili-odoo:latest
+
+name: sikili-stack
+
+services:
+  db:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    shm_size: "256mb"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-sikili}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - log_connections=off
+      - -c
+      - log_disconnections=off
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -h 127.0.0.1 -p 5432",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - internal
+
+  odoo:
+    image: ${SIKILI_ODOO_IMAGE:?Set SIKILI_ODOO_IMAGE to your registry image}
+    pull_policy: always
+    restart: unless-stopped
+    user: "0:0"
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8069"
+      - "8072"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-sikili}
+      ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:?Define ODOO_ADDONS_PATH in .env}
+      ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD:?Define ODOO_ADMIN_PASSWD in .env}
+      ODOO_INIT_MODULES: ${ODOO_INIT_MODULES:-sale_management,account}
+      ODOO_RC: /etc/odoo/odoo.conf
+    volumes:
+      - odoo_data:/var/lib/odoo
+    command: ["odoo"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python3 -c \"import socket; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1',8069)); s.close()\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 360s
+    networks:
+      - internal
+
+  webapp:
+    image: ${SIKILI_WEBAPP_IMAGE:?Set SIKILI_WEBAPP_IMAGE to your registry image}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      odoo:
+        condition: service_healthy
+    ports:
+      - "8000"
+    env_file:
+      - .env
+    environment:
+      PGHOST: ${POSTGRES_HOST:-db}
+      PGPORT: ${POSTGRES_PORT:-5432}
+      PGUSER: ${POSTGRES_USER:-odoo}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      PGDATABASE: ${POSTGRES_DB:-sikili}
+      ODOO_URL: http://odoo:8069
+      ODOO_LOGIN: ${ODOO_LOGIN:-admin}
+      ODOO_PASSWORD: ${ODOO_PASSWORD:?Set ODOO_PASSWORD in .env for Odoo XML-RPC}
+    networks:
+      - internal
+      - dokploy-network
+    command: >
+      sh -c "alembic upgrade head &&
+      exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  postgres_data:
+  odoo_data:
+
+networks:
+  internal:
+    driver: bridge
+  dokploy-network:
+    external: true

@@ -1,0 +1,18 @@
+# Odoo image for production / Dokploy : the entrypoint and addons are
+# in the image to avoid bind mounts from the repo (git clone at each deployment).
+FROM odoo:18.0
+
+USER root
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY docker/odoo/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod 755 /docker-entrypoint.sh
+
+COPY addons /mnt/extra-addons
+RUN chown -R odoo:odoo /mnt/extra-addons
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["odoo"]
